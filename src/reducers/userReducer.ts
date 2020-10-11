@@ -10,6 +10,7 @@ const initialState = {
     resetRequestMessage: '',
     resetError: '',
     resetMessage: '',
+    updateError: ''
 };
 
 export default function reducer(state = initialState, action: any) {
@@ -42,6 +43,12 @@ export default function reducer(state = initialState, action: any) {
             return { ...initialState }
         case 'USER_VALIDATE_TOKEN_COMPLETE':
             return { ...state, tokenValidated: true }
+        case 'USER_UPDATE_READY':
+            return { ...state, updateError: '' }
+        case 'USER_UPDATE_SUCCESS':
+            return { ...state, currentUser: { ...state.currentUser, ...action.user } }
+        case 'USER_UPDATE_FAILURE':
+            return { ...state, updateError: action.error }
         default:
             return state;
     };

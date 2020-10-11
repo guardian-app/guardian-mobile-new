@@ -25,6 +25,7 @@ const ParentProfile = (props: { navigation: Navigation }) => {
         <>
             <Appbar.Header>
                 <Appbar.Content title="Profile" />
+                <Appbar.Action icon="pencil" onPress={() => { props.navigation.navigate("EditProfileScene") }} />
             </Appbar.Header>
             <Background>
                 <Logo />

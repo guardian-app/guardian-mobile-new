@@ -26,7 +26,7 @@ export const nameValidator = (name: string, section: string) => {
 };
 
 export const addressValidator = (address: string) => {
-    if (!address || address.length <= 0 || !address.match(/^[A-z0-9]+\s[A-z0-9]+/g)) return 'Address seems to be invalid.';
+    if (!address || address.length <= 0 || !address.match(/^[A-z0-9]+\,?\s[A-z0-9]+/g)) return 'Address seems to be invalid.';
 
     return '';
 };

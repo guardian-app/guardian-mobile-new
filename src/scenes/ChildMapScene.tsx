@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, createRef } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import * as Location from 'expo-location';
 import { useSelector, useDispatch } from 'react-redux';
-import { Appbar, Menu, Divider, Dialog, Paragraph, Portal, Snackbar } from 'react-native-paper';
+import { Appbar, Menu, Divider, Dialog, Paragraph, Portal, Snackbar, Button as PaperButton } from 'react-native-paper';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, ScrollView, View, Text, Dimensions } from 'react-native';
 import MapView, { Marker, Polyline, LatLng, EdgePadding } from 'react-native-maps';
@@ -193,11 +193,14 @@ const ChildMap = ({ route, navigation }: Props) => {
                         <Paragraph>Do you really want to remove this child? All location data will be deleted permanently.</Paragraph>
                     </Dialog.Content>
                     <Dialog.Actions>
-                        <Button onPress={() => {
+                        <PaperButton onPress={() => {
+                            hideDialog();
+                        }}>Cancel</PaperButton>
+                        <PaperButton onPress={() => {
                             _childDelete(child);
                             hideDialog();
                             navigation.goBack();
-                        }}>Delete</Button>
+                        }}>OK</PaperButton>
                     </Dialog.Actions>
                 </Dialog>
             </Portal>

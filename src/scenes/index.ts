@@ -7,3 +7,4 @@ export { default as ChildDashboardScene } from './ChildDashboardScene';
 export { default as AddChildScene } from './AddChildScene';
 export { default as SplashScene } from './SplashScene';
 export { default as ChildMapScene } from './ChildMapScene';
+export { default as EditProfileScene } from './EditProfileScene';

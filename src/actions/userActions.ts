@@ -28,6 +28,34 @@ export const userCreate = (user: User) => {
     };
 };
 
+export const userUpdate = (user: User) => {
+    return async (dispatch: Function) => {
+        dispatch(userUpdate_Ready());
+
+        const token = await SecureStore.getItemAsync("token");
+        const request = fetch(
+            `http://${process.env.SERVER_HOST}:${process.env.SERVER_PORT}/users/me`,
+            {
+                method: "PUT",
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ ...user })
+            }
+        );
+
+        try {
+            const response = await request;
+            if (response.ok) {
+                dispatch(userUpdate_Success(await response.json()));
+            } else {
+                dispatch(userUpdate_Failure(await response.text()));
+            };
+        } catch (err) {
+            console.warn(err);
+            userUpdate_Failure("Unexpected error occured!");
+        };
+    };
+};
+
 export const userAuthenticate = (user: User) => {
     return async (dispatch: Function) => {
         dispatch(userAuthenticate_Ready());
@@ -166,6 +194,20 @@ const userAuthenticate_Success = (user: User, token: string) => ({
 
 const userAuthenticate_Failure = (message: string) => ({
     type: 'USER_AUTHENTICATE_FAILURE',
+    error: message
+});
+
+const userUpdate_Ready = () => ({
+    type: 'USER_UPDATE_READY'
+});
+
+const userUpdate_Success = (user: User) => ({
+    type: 'USER_UPDATE_SUCCESS',
+    user: user,
+});
+
+const userUpdate_Failure = (message: string) => ({
+    type: 'USER_UPDATE_FAILURE',
     error: message
 });
 

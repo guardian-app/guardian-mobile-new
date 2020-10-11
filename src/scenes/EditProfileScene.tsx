@@ -16,7 +16,7 @@ import {
     addressValidator,
     phoneValidator
 } from '../utils/validators';
-import { childAdd } from '../actions';
+import { userUpdate } from '../actions';
 import { User, Navigation } from '../types';
 import { colors, theme } from '../styles';
 
@@ -24,33 +24,30 @@ type Props = {
     navigation: Navigation;
 };
 
-const AddChild = ({ navigation }: Props) => {
-    const [emailAddress, setEmailAddress] = useState({ value: '', error: '' });
+const EditProfile = ({ navigation }: Props) => {
+    const updateError: string = useSelector((state: any) => state.userReducer.updateError);
+    const currentUser: User = useSelector((state: any) => state.userReducer.currentUser);
+
     const [password, setPassword] = useState({ value: '', error: '' });
     const [confirmPassword, setConfirmPassword] = useState({ value: '', error: '' });
-    const [firstName, setFirstName] = useState({ value: '', error: '' });
-    const [lastName, setLastName] = useState({ value: '', error: '' })
-    const [address, setAddress] = useState({ value: '', error: '' });
-    const [phoneNumber, setPhoneNumber] = useState({ value: '', error: '' });
+    const [firstName, setFirstName] = useState({ value: currentUser.first_name, error: '' });
+    const [lastName, setLastName] = useState({ value: currentUser.last_name, error: '' })
+    const [address, setAddress] = useState({ value: currentUser.address, error: '' });
+    const [phoneNumber, setPhoneNumber] = useState({ value: currentUser.phone_number, error: '' });
     const [submitted, setSubmitted] = useState(false);
 
     const dispatch = useDispatch()
-    const _childAdd = (child: User) => dispatch(childAdd(child));
+    const _userUpdate = (user: User) => dispatch(userUpdate(user));
 
-    const error = useSelector((state: any) => state.childReducer.error);
-    const message = useSelector((state: any) => state.childReducer.message);
+    const _onUpdatePressed = () => {
+        const passwordError = password.value && passwordValidator(password.value);
+        const confirmPasswordError = password.value && confirmPasswordValidator(password.value, confirmPassword.value);
+        const firstNameError = nameValidator(firstName.value || '', 'First');
+        const lastNameError = nameValidator(lastName.value || '', 'Last');
+        const addressError = addressValidator(address.value || '');
+        const phoneNumberError = phoneValidator(phoneNumber.value || '');
 
-    const _onAddPressed = () => {
-        const emailAddressError = emailValidator(emailAddress.value);
-        const passwordError = passwordValidator(password.value);
-        const confirmPasswordError = confirmPasswordValidator(password.value, confirmPassword.value);
-        const firstNameError = nameValidator(firstName.value, 'First');
-        const lastNameError = nameValidator(lastName.value, 'Last');
-        const addressError = addressValidator(address.value);
-        const phoneNumberError = phoneValidator(phoneNumber.value);
-
-        if (emailAddressError || passwordError || confirmPasswordError || firstNameError || lastNameError || addressError || phoneNumberError) {
-            setEmailAddress({ ...emailAddress, error: emailAddressError });
+        if (passwordError || confirmPasswordError || firstNameError || lastNameError || addressError || phoneNumberError) {
             setPassword({ ...password, error: passwordError });
             setConfirmPassword({ ...confirmPassword, error: confirmPasswordError });
             setFirstName({ ...firstName, error: firstNameError });
@@ -60,8 +57,8 @@ const AddChild = ({ navigation }: Props) => {
             return;
         };
 
-        _childAdd({
-            email_address: emailAddress.value,
+        _userUpdate({
+            email_address: currentUser.email_address,
             password: password.value,
             first_name: firstName.value,
             last_name: lastName.value,
@@ -73,14 +70,14 @@ const AddChild = ({ navigation }: Props) => {
     };
 
     useEffect(() => {
-        if (submitted && message.length && !error.length) navigation.goBack();
-    }, [message, error, submitted]);
+        if (submitted && !updateError.length) navigation.goBack();
+    }, [updateError, submitted]);
 
     return (
         <>
             <Appbar.Header>
                 <Appbar.BackAction onPress={navigation.goBack} />
-                <Appbar.Content title="Add Child" />
+                <Appbar.Content title="Edit Profile" />
             </Appbar.Header>
 
             <PlainBackground>
@@ -88,15 +85,11 @@ const AddChild = ({ navigation }: Props) => {
                     <TextInput
                         label="Email"
                         returnKeyType="next"
-                        value={emailAddress.value}
-                        onChangeText={text => setEmailAddress({ value: text, error: '' })}
-                        error={!!emailAddress.error}
-                        errorText={emailAddress.error}
-                        autoCapitalize="none"
-                        autoCompleteType="email"
-                        textContentType="emailAddress"
-                        keyboardType="email-address"
+                        value={currentUser.email_address}
+                        disabled
                     />
+
+                    <Text>You cannot change your e-mail address.</Text>
 
                     <TextInput
                         label="Password"
@@ -108,6 +101,7 @@ const AddChild = ({ navigation }: Props) => {
                         secureTextEntry
                     />
 
+
                     <TextInput
                         label="Confirm password"
                         returnKeyType="next"
@@ -116,7 +110,10 @@ const AddChild = ({ navigation }: Props) => {
                         error={!!confirmPassword.error}
                         errorText={confirmPassword.error}
                         secureTextEntry
+                        
                     />
+
+                    <Text>Leave the password fields empty if you don't want to change the password.</Text>
 
                     <TextInput
                         label="First name"
@@ -157,12 +154,12 @@ const AddChild = ({ navigation }: Props) => {
                     />
                 </ScrollView>
 
-                {(submitted && error && error.length) ? <Text style={styles.errorText}>{error}</Text> : null}
+                {(submitted && updateError && updateError.length) ? <Text style={styles.errorText}>{updateError}</Text> : null}
 
 
                 <View style={styles.container}>
-                    <Button mode="contained" onPress={_onAddPressed} style={styles.button}>
-                        Add
+                    <Button mode="contained" onPress={_onUpdatePressed} style={styles.button}>
+                        Update
                     </Button>
                 </View>
 
@@ -207,4 +204,4 @@ const styles = StyleSheet.create({
     }
 });
 
-export default memo(AddChild);
+export default memo(EditProfile);
