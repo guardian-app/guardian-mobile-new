@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, createRef } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import * as Location from 'expo-location';
 import { useSelector, useDispatch } from 'react-redux';
-import { Appbar, Menu, Divider, Dialog, Paragraph, Portal, Snackbar, Button as PaperButton } from 'react-native-paper';
+import { Appbar, Menu, Divider, Dialog, Paragraph, Portal, Snackbar, Button as PaperButton, FAB } from 'react-native-paper';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, ScrollView, View, Text, Dimensions } from 'react-native';
 import MapView, { Marker, Polyline, LatLng, EdgePadding } from 'react-native-maps';
@@ -49,6 +49,9 @@ const ChildMap = ({ route, navigation }: Props) => {
     const [dateMenuVisible, setDateMenuVisible] = useState(false);
     const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
 
+    const [addingGeofence, setAddingGeofence] = useState(true);
+    const [geofenceRadius, setGeofenceRadius] = useState(1);
+
     const mapRef = useRef<MapView>(null);
 
     const openMenu = () => setMenuVisible(true);
@@ -61,18 +64,38 @@ const ChildMap = ({ route, navigation }: Props) => {
     const dispatch = useDispatch()
     const _childDelete = (child: User) => dispatch(childDelete(child));
 
-    useEffect(() => {
-        if (mapRef.current) {
+
+
+    const recenterMap = () => {
+        if (mapRef.current && markers.length) {
             // list of _id's must same that has been provided to the identifier props of the Marker
-            mapRef.current.fitToSuppliedMarkers(markers.map(({ id }) => id), {
+            mapRef.current?.fitToSuppliedMarkers(markers.map(({ id }) => id), {
                 edgePadding: {
-                    top: 600,
-                    bottom: 600,
-                    left: 600,
-                    right: 600
+                    top: 10,
+                    bottom: 10,
+                    left: 10,
+                    right: 10
                 }
             });
+        } else {
+            mapRef.current?.animateToRegion({
+                latitude: 7.2906,
+                longitude: 80.6337,
+                latitudeDelta: 2.5,
+                longitudeDelta: 2.5,
+            });
         }
+    }
+
+    useEffect(() => {
+        mapRef.current?.fitToSuppliedMarkers(markers.map(({ id }) => id), {
+            edgePadding: {
+                top: 10,
+                bottom: 10,
+                left: 10,
+                right: 10
+            }
+        });
     }, [markers]);
 
     useEffect(() => {
@@ -158,8 +181,6 @@ const ChildMap = ({ route, navigation }: Props) => {
         })();
     }, [dateSelection]);
 
-    const _handleMore = () => console.log('Shown more');
-
     const todayDate = new Date();
     const dateSelectionMenuItems = [];
     for (let i = 0; i < 7; i++) {
@@ -183,6 +204,7 @@ const ChildMap = ({ route, navigation }: Props) => {
             />
         );
     };
+
 
     return (
         <>
@@ -213,6 +235,7 @@ const ChildMap = ({ route, navigation }: Props) => {
                     anchor={<Appbar.Action icon="dots-vertical" color="white" onPress={openMenu} />
                     }>
                     <Menu.Item onPress={() => {
+                        navigation.navigate("EditChildScene", { user_id: child.user_id })
                         closeMenu();
                     }} title="Edit" />
                     <Menu.Item onPress={() => {
@@ -221,6 +244,17 @@ const ChildMap = ({ route, navigation }: Props) => {
                     }} title="Remove" />
                 </Menu>
             </Appbar.Header>
+            <View>
+                <View style={styles.topContainer}>
+                    <View style={{ flex: 12 }}>
+                        <Text>Radius:</Text>
+                        <Text style={{ fontWeight: "bold", fontSize: 24 }}>{geofenceRadius}km</Text>
+                    </View>
+                    <PaperButton compact style={styles.radiusAdjustButtonStyle} labelStyle={styles.text} onPress={() => setGeofenceRadius((currentRadius) => currentRadius + 1)}>+</PaperButton>
+                    <PaperButton compact disabled={geofenceRadius === 1} style={styles.radiusAdjustButtonStyle} labelStyle={styles.text} onPress={() => setGeofenceRadius((currentRadius) => currentRadius - 1)}>-</PaperButton>
+                </View>
+                <Button onPress={() => console.warn("CONFIRM")}>Add Geofence</Button>
+            </View>
 
             <PlainBackground>
                 <MapView
@@ -231,7 +265,6 @@ const ChildMap = ({ route, navigation }: Props) => {
                         longitude: 80.6337,
                         latitudeDelta: 2.5,
                         longitudeDelta: 2.5,
-
                     }}>
                     {markers.map((marker: any) => {
                         return (
@@ -301,19 +334,38 @@ const ChildMap = ({ route, navigation }: Props) => {
                     }}>
                     {errorMessage}
                 </Snackbar>
+
+                <FAB
+                    style={styles.fab_top}
+                    icon="crosshairs-gps"
+                    onPress={recenterMap}
+                />
+                <FAB
+                    style={styles.fab_bottom}
+                    icon="plus"
+                    label="Geofence"
+                    onPress={() => { }}
+                />
             </PlainBackground>
+
             <StatusBar style="light" />
         </>
     );
 };
 
-
 const styles = StyleSheet.create({
-    fab: {
+    fab_top: {
         position: 'absolute',
-        margin: 48,
+        margin: 36,
         right: 0,
-        bottom: 0,
+        bottom: 48,
+        backgroundColor: colors.light
+    },
+    fab_bottom: {
+        position: 'absolute',
+        margin: 36,
+        right: 0,
+        bottom: 120,
         backgroundColor: colors.light
     },
     mapStyle: {
@@ -326,6 +378,21 @@ const styles = StyleSheet.create({
         right: 0,
         bottom: 0,
     },
+    topContainer: {
+        padding: 16,
+        fontSize: 36,
+        flexDirection: "row"
+    },
+    text: {
+        fontWeight: 'bold',
+        fontSize: 15,
+        lineHeight: 26,
+    },
+    radiusAdjustButtonStyle: {
+        backgroundColor: theme.colors.surface,
+        flex: 1,
+        margin: 4
+    }
 });
 
 export default ChildMap;

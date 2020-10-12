@@ -13,7 +13,8 @@ import {
     SplashScene,
     AddChildScene,
     ChildMapScene,
-    EditProfileScene
+    EditProfileScene,
+    EditChildScene
 } from './scenes';
 import { userValidateToken as _userValidateToken } from './actions';
 
@@ -41,6 +42,7 @@ const AppContainer = () => {
                             <Stack.Screen name="AddChildScene" component={AddChildScene} />
                             <Stack.Screen name="ChildMapScene" component={ChildMapScene} />
                             <Stack.Screen name="EditProfileScene" component={EditProfileScene} />
+                            <Stack.Screen name="EditChildScene" component={EditChildScene} />
                         </Stack.Navigator>
                     </NavigationContainer>
                 );

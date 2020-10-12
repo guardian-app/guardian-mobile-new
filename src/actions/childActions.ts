@@ -55,6 +55,34 @@ export const childAdd = (child: User) => {
     };
 };
 
+export const childUpdate = (child: User) => {
+    return async (dispatch: Function) => {
+        dispatch(childUpdate_Ready());
+
+        try {
+            const token = await SecureStore.getItemAsync("token");
+            const request = fetch(
+                `http://${process.env.SERVER_HOST}:${process.env.SERVER_PORT}/children/${child.user_id}`,
+                {
+                    method: "PUT",
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify(child)
+                }
+            );
+
+            const response = await request;
+            if (response.ok) {
+                dispatch(childUpdate_Success(await response.json(), "Success"));
+            } else {
+                dispatch(childUpdate_Failure(await response.text()));
+            };
+        } catch (err) {
+            console.warn(err);
+            childUpdate_Failure("Unexpected error occured!");
+        };
+    };
+};
+
 export const childDelete = (child: User) => {
     return async (dispatch: Function) => {
         try {
@@ -101,6 +129,21 @@ const childAdd_Success = (child: User, message: string) => ({
 
 const childAdd_Failure = (error: string) => ({
     type: 'CHILD_ADD_FAILURE',
+    error: error
+});
+
+const childUpdate_Ready = () => ({
+    type: 'CHILD_UPDATE_READY'
+});
+
+const childUpdate_Success = (child: User, message: string) => ({
+    type: 'CHILD_UPDATE_SUCCESS',
+    child: child,
+    message: message
+});
+
+const childUpdate_Failure = (error: string) => ({
+    type: 'CHILD_UPDATE_FAILURE',
     error: error
 });
 
