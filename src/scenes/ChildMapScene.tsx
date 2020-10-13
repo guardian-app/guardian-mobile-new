@@ -4,8 +4,8 @@ import * as Location from 'expo-location';
 import { useSelector, useDispatch } from 'react-redux';
 import { Appbar, Menu, Divider, Dialog, Paragraph, Portal, Snackbar, Button as PaperButton, FAB } from 'react-native-paper';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, ScrollView, View, Text, Dimensions } from 'react-native';
-import MapView, { Marker, Polyline, LatLng, EdgePadding } from 'react-native-maps';
+import { StyleSheet, ScrollView, View, Text, Dimensions, TextInput as VanillaTextInput } from 'react-native';
+import MapView, { Marker, Polyline, LatLng, EdgePadding, Circle } from 'react-native-maps';
 import * as timeago from 'timeago.js';
 import {
     PlainBackground,
@@ -34,6 +34,14 @@ type Coords = {
     longitude: number
 };
 
+type Geofence = {
+    latitude: number,
+    longitude: number,
+    radius: number,
+    name: string,
+    geofence_id?: number
+}
+
 type DateSelection = "real-time" | Date;
 
 const ChildMap = ({ route, navigation }: Props) => {
@@ -43,14 +51,17 @@ const ChildMap = ({ route, navigation }: Props) => {
     const [dateSelection, setDateSelection] = useState<DateSelection>("real-time");
     const [lastSeen, setLastSeen] = useState("unavailable");
     const [markers, setMarkers] = useState<MarkerType[]>([]);
+    const [geofences, setGeofences] = useState<Geofence[]>([]);
     const [errorVisible, setErrorVisible] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [menuVisible, setMenuVisible] = useState(false);
     const [dateMenuVisible, setDateMenuVisible] = useState(false);
     const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
 
-    const [addingGeofence, setAddingGeofence] = useState(true);
-    const [geofenceRadius, setGeofenceRadius] = useState(1);
+    const [addingGeofence, setAddingGeofence] = useState(false);
+    const [geofenceRadius, setGeofenceRadius] = useState(150);
+    const [geofenceCoords, setGeofenceCoords] = useState<Coords>();
+    const [geofenceName, setGeofenceName] = useState("New");
 
     const mapRef = useRef<MapView>(null);
 
@@ -63,8 +74,6 @@ const ChildMap = ({ route, navigation }: Props) => {
 
     const dispatch = useDispatch()
     const _childDelete = (child: User) => dispatch(childDelete(child));
-
-
 
     const recenterMap = () => {
         if (mapRef.current && markers.length) {
@@ -96,90 +105,122 @@ const ChildMap = ({ route, navigation }: Props) => {
                 right: 10
             }
         });
+
+        const geofenceMarker = markers.find(marker => marker.id === "new-geofence");
+        if (geofenceMarker) {
+            setGeofenceCoords(geofenceMarker.coordinate)
+        } else {
+            setGeofenceCoords(undefined);
+        };
     }, [markers]);
 
     useEffect(() => {
-        (async () => {
-            const token = await SecureStore.getItemAsync("token");
-
-            let { status } = await Location.requestPermissionsAsync();
-            if (status !== 'granted') return setErrorMessage('Permission to access location was denied');
-
-            if (dateSelection === "real-time") {
-                try {
-                    const request = fetch(
-                        `http://${process.env.SERVER_HOST}:${process.env.SERVER_PORT}/location/${user_id}`,
-                        {
-                            method: "GET",
-                            headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${token}` },
-                        }
-                    );
-
-                    const response = await request;
-                    if (response.ok) {
-                        const object = await response.json();
-
-                        const objectDate = new Date(object.timestamp);
-                        const objectLocation: Coords = {
-                            latitude: parseFloat(object.latitude),
-                            longitude: parseFloat(object.longitude)
-                        };
-                        const objectAddress = await Location.reverseGeocodeAsync(objectLocation);
-
-                        setLastSeen(timeago.format(objectDate));
-                        setMarkers([{
-                            coordinate: objectLocation,
-                            title: `${objectAddress[0].name}, ${objectAddress[0].street}, ${objectAddress[0].city} (${timeago.format(objectDate)})`,
-                            description: `${objectDate.toDateString()} at ${objectDate.toLocaleTimeString()}`,
-                            id: object.timestamp + object.longitude + object.latitude
-                        }]);
-                    } else {
-                        setMarkers([]);
-                        setErrorMessage("No location data available at the moment. Make sure you setup the Guardian application on your child's mobile device.");
-                        setErrorVisible(true);
-                    };
-                } catch (err) {
-                    setMarkers([]);
-                    console.warn(err);
-                };
-            } else {
-                try {
-                    const request = fetch(
-                        `http://${process.env.SERVER_HOST}:${process.env.SERVER_PORT}/location/${user_id}/history/${formatDate(dateSelection)}`,
-                        {
-                            method: "GET",
-                            headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${token}` },
-                        }
-                    );
-
-                    const response = await request;
-                    if (response.ok) {
-                        const data: any[] = await response.json();
-
-                        setMarkers(data.map((object: any) => {
-                            const objectDate = new Date(object.timestamp);
-                            return {
-                                coordinate: {
-                                    latitude: parseFloat(object.latitude),
-                                    longitude: parseFloat(object.longitude)
-                                },
-                                title: objectDate.toDateString(),
-                                description: `${objectDate.toLocaleTimeString()} (${timeago.format(objectDate)})`,
-                                id: object.timestamp + object.longitude + object.latitude
-                            };
-                        }));
-                    } else {
-                        setMarkers([]);
-                        setErrorMessage("No location data available for the selected date. Make sure you setup the Guardian application on your child's mobile device.");
-                        setErrorVisible(true);
-                    };
-                } catch (err) {
-                    setMarkers([]);
-                    console.warn(err);
-                };
-            }
-        })();
+        fetchData();
     }, [dateSelection]);
+
+    const fetchData = async () => {
+        const token = await SecureStore.getItemAsync("token");
+
+        let { status } = await Location.requestPermissionsAsync();
+        if (status !== 'granted') return setErrorMessage('Permission to access location was denied');
+
+        if (dateSelection === "real-time") {
+            try {
+                const request = fetch(
+                    `http://${process.env.SERVER_HOST}:${process.env.SERVER_PORT}/location/${user_id}`,
+                    {
+                        method: "GET",
+                        headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${token}` },
+                    }
+                );
+
+                const response = await request;
+                if (response.ok) {
+                    const object = await response.json();
+
+                    const objectDate = new Date(object.timestamp);
+                    const objectLocation: Coords = {
+                        latitude: parseFloat(object.latitude),
+                        longitude: parseFloat(object.longitude)
+                    };
+                    const objectAddress = await Location.reverseGeocodeAsync(objectLocation);
+
+                    setLastSeen(timeago.format(objectDate));
+                    setMarkers([{
+                        coordinate: objectLocation,
+                        title: `${objectAddress[0].name}, ${objectAddress[0].street}, ${objectAddress[0].city} (${timeago.format(objectDate)})`,
+                        description: `${objectDate.toDateString()} at ${objectDate.toLocaleTimeString()}`,
+                        id: object.timestamp + object.longitude + object.latitude
+                    }]);
+                } else {
+                    setMarkers([]);
+                    setErrorMessage("No location data available at the moment. Make sure you setup the Guardian application on your child's mobile device.");
+                    setErrorVisible(true);
+                };
+            } catch (err) {
+                setMarkers([]);
+                console.warn(err);
+            };
+        } else {
+            try {
+                const request = fetch(
+                    `http://${process.env.SERVER_HOST}:${process.env.SERVER_PORT}/location/${user_id}/history/${formatDate(dateSelection)}`,
+                    {
+                        method: "GET",
+                        headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${token}` },
+                    }
+                );
+
+                const response = await request;
+                if (response.ok) {
+                    const data: any[] = await response.json();
+
+                    setMarkers(data.map((object: any) => {
+                        const objectDate = new Date(object.timestamp);
+                        return {
+                            coordinate: {
+                                latitude: parseFloat(object.latitude),
+                                longitude: parseFloat(object.longitude)
+                            },
+                            title: objectDate.toDateString(),
+                            description: `${objectDate.toLocaleTimeString()} (${timeago.format(objectDate)})`,
+                            id: object.timestamp + object.longitude + object.latitude
+                        };
+                    }));
+                } else {
+                    setMarkers([]);
+                    setErrorMessage("No location data available for the selected date. Make sure you setup the Guardian application on your child's mobile device.");
+                    setErrorVisible(true);
+                };
+            } catch (err) {
+                setMarkers([]);
+                console.warn(err);
+            };
+        };
+
+        // Geo-fences
+        const request = fetch(
+            `http://${process.env.SERVER_HOST}:${process.env.SERVER_PORT}/geofence/${user_id}`,
+            {
+                method: "GET",
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${token}` },
+            }
+        );
+        const response = await request;
+        if (response.ok) {
+            const data: any[] = await response.json();
+            setGeofences(data.map((object: any) => {
+                return {
+                    latitude: parseFloat(object.latitude),
+                    longitude: parseFloat(object.longitude),
+                    radius: object.radius,
+                    name: object.name
+                };
+            }));
+        } else {
+            console.warn("Unable to fetch geofences!");
+        }
+    };
 
     const todayDate = new Date();
     const dateSelectionMenuItems = [];
@@ -192,6 +233,7 @@ const ChildMap = ({ route, navigation }: Props) => {
                 onPress={() => {
                     setDateSelection(currentDate);
                     setDateMenuVisible(false);
+                    setAddingGeofence(false);
                 }}
                 title={
                     i === 0
@@ -204,7 +246,6 @@ const ChildMap = ({ route, navigation }: Props) => {
             />
         );
     };
-
 
     return (
         <>
@@ -244,17 +285,57 @@ const ChildMap = ({ route, navigation }: Props) => {
                     }} title="Remove" />
                 </Menu>
             </Appbar.Header>
-            <View>
-                <View style={styles.topContainer}>
-                    <View style={{ flex: 12 }}>
-                        <Text>Radius:</Text>
-                        <Text style={{ fontWeight: "bold", fontSize: 24 }}>{geofenceRadius}km</Text>
+            {addingGeofence &&
+                <View>
+                    <View style={styles.topContainer}>
+                        <View style={{ flex: 256 }}>
+                            <Text>Radius</Text>
+                            <Text style={{ fontWeight: "bold", fontSize: 24 }}>{geofenceRadius}m</Text>
+                        </View>
+                        <View style={{ flex: 256 }}>
+                            <Text>Name</Text>
+                            <VanillaTextInput style={{ fontSize: 24 }} onChangeText={(text => setGeofenceName(text))}>{geofenceName}</VanillaTextInput>
+                        </View>
+                        <PaperButton style={styles.radiusAdjustButtonStyle} labelStyle={styles.text} onPress={() => setGeofenceRadius((currentRadius) => currentRadius + 150)}>+</PaperButton>
+                        <PaperButton disabled={geofenceRadius === 150} style={styles.radiusAdjustButtonStyle} labelStyle={styles.text} onPress={() => setGeofenceRadius((currentRadius) => currentRadius - 150)}>-</PaperButton>
                     </View>
-                    <PaperButton compact style={styles.radiusAdjustButtonStyle} labelStyle={styles.text} onPress={() => setGeofenceRadius((currentRadius) => currentRadius + 1)}>+</PaperButton>
-                    <PaperButton compact disabled={geofenceRadius === 1} style={styles.radiusAdjustButtonStyle} labelStyle={styles.text} onPress={() => setGeofenceRadius((currentRadius) => currentRadius - 1)}>-</PaperButton>
+                    <Button onPress={async () => {
+                        if (geofenceCoords && geofenceName) {
+                            try {
+                                const token = await SecureStore.getItemAsync("token");
+                                const request = fetch(
+                                    `http://${process.env.SERVER_HOST}:${process.env.SERVER_PORT}/geofence/${user_id}`,
+                                    {
+                                        method: "POST",
+                                        body: JSON.stringify({
+                                            longitude: geofenceCoords.longitude,
+                                            latitude: geofenceCoords?.latitude,
+                                            radius: geofenceRadius,
+                                            name: geofenceName
+                                        }),
+                                        headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${token}` },
+                                    }
+                                );
+
+                                const response = await request;
+                                if (!response.ok) console.warn(await response.text());
+                                else await fetchData();
+                            } catch (err) {
+                                console.warn(err);
+                            };
+
+                            // Discard new geofence details
+                            setMarkers([...markers.filter(marker => marker.id !== "new-geofence")]);
+                            setGeofenceRadius(150);
+                            setGeofenceCoords(undefined);
+                            setAddingGeofence(false);
+                        } else {
+                            setErrorMessage("You need to provide an identifier for this geofence!");
+                            setErrorVisible(true);
+                        };
+                    }}>Add Geofence</Button>
                 </View>
-                <Button onPress={() => console.warn("CONFIRM")}>Add Geofence</Button>
-            </View>
+            }
 
             <PlainBackground>
                 <MapView
@@ -266,7 +347,7 @@ const ChildMap = ({ route, navigation }: Props) => {
                         latitudeDelta: 2.5,
                         longitudeDelta: 2.5,
                     }}>
-                    {markers.map((marker: any) => {
+                    {markers.map((marker) => {
                         return (
                             <Marker
                                 key={marker.id}
@@ -274,13 +355,14 @@ const ChildMap = ({ route, navigation }: Props) => {
                                 coordinate={marker.coordinate}
                                 title={marker.title}
                                 description={marker.description}
+                                pinColor={marker.id === "new-geofence" ? "purple" : "red"}
                             />
                         )
                     })}
 
                     <Polyline
                         coordinates={
-                            markers.map((marker: any) => ({
+                            markers.filter(marker => marker.id !== "new-geofence").map(marker => ({
                                 latitude: marker.coordinate.latitude,
                                 longitude: marker.coordinate.longitude
                             }))
@@ -296,6 +378,27 @@ const ChildMap = ({ route, navigation }: Props) => {
                         ]}
                         strokeWidth={6}
                     />
+
+                    {geofenceCoords &&
+                        <Circle
+                            center={geofenceCoords}
+                            radius={geofenceRadius}
+                            fillColor="rgba(127,0,127, 0.4)"
+                        />
+                    }
+
+                    {geofences.map(geofence => {
+                        const { longitude, latitude, radius, geofence_id } = geofence;
+                        return (
+                            <Circle
+                                center={{ longitude, latitude }}
+                                radius={radius}
+                                fillColor="rgba(127,0,127, 0.4)"
+                                key={geofence_id}
+                            />
+                        );
+                    })}
+
                 </MapView>
 
                 <Appbar style={styles.bottom}>
@@ -317,6 +420,7 @@ const ChildMap = ({ route, navigation }: Props) => {
                         <Menu.Item onPress={() => {
                             setDateSelection("real-time");
                             setDateMenuVisible(false);
+                            setAddingGeofence(false);
                         }} title="Real-time" />
                         <Divider />
                         {dateSelectionMenuItems}
@@ -342,9 +446,30 @@ const ChildMap = ({ route, navigation }: Props) => {
                 />
                 <FAB
                     style={styles.fab_bottom}
-                    icon="plus"
-                    label="Geofence"
-                    onPress={() => { }}
+                    icon={addingGeofence ? "arrow-left" : "plus"}
+                    label={addingGeofence ? "Cancel" : "Geofence"}
+                    onPress={async () => {
+                        if (!addingGeofence) {
+                            const camera = await mapRef.current?.getCamera();
+                            const longitude = camera?.center.longitude;
+                            const latitude = camera?.center.latitude;
+
+                            if (longitude && latitude) {
+                                setAddingGeofence(true);
+                                setMarkers([...markers, {
+                                    coordinate: { longitude, latitude },
+                                    title: "New Geofence",
+                                    description: `Adjust the radius.`,
+                                    id: "new-geofence",
+                                }]);
+                            };
+                        } else {
+                            setMarkers([...markers.filter(marker => marker.id !== "new-geofence")]);
+                            setGeofenceRadius(150);
+                            setGeofenceCoords(undefined);
+                            setAddingGeofence(false);
+                        }
+                    }}
                 />
             </PlainBackground>
 
