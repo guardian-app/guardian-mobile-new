@@ -72,7 +72,7 @@ export const userAuthenticate = (user: User) => {
         try {
             const response = await request;
             if (response.ok) {
-                const { token, user } = await response.json();
+                const { token, user } = await response.json();console.log(user);
                 await SecureStore.setItemAsync("token", token);
                 await SecureStore.setItemAsync("user", JSON.stringify(user));
 

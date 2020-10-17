@@ -13,7 +13,7 @@ import {
     Button
 } from '../components';
 import { formatDate } from '../utils/formatters';
-import { User, Navigation } from '../types';
+import { User, Navigation, Geofence } from '../types';
 import { childDelete } from '../actions';
 import { colors, theme } from '../styles';
 
@@ -33,14 +33,6 @@ type Coords = {
     latitude: number,
     longitude: number
 };
-
-type Geofence = {
-    latitude: number,
-    longitude: number,
-    radius: number,
-    name: string,
-    geofence_id?: number
-}
 
 type DateSelection = "real-time" | Date;
 
@@ -384,6 +376,7 @@ const ChildMap = ({ route, navigation }: Props) => {
                             center={geofenceCoords}
                             radius={geofenceRadius}
                             fillColor="rgba(127,0,127, 0.4)"
+                            key="temp"
                         />
                     }
 

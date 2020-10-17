@@ -14,3 +14,11 @@ export type User = {
     phone_number?: string,
     role?: string
 };
+
+export type Geofence = {
+    latitude: number,
+    longitude: number,
+    radius: number,
+    name: string,
+    geofence_id?: number
+}
